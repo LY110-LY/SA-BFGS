@@ -1,0 +1,142 @@
+import numpy as np
+import xlrd
+import math
+
+workbook = xlrd.open_workbook(r'feature.xlsx')
+workbook2 = xlrd.open_workbook(r'labels.xlsx')
+# print(workbook2.sheet_names())#输出页签名r
+
+feature = workbook.sheet_by_name('Sheet1')
+labels = workbook2.sheet_by_name('Sheet1')
+feature_nrows = feature.nrows
+feature_ncols = feature.ncols
+labels_nrows = labels.nrows
+labels_ncols = labels.ncols
+g = np.empty([432, 1])
+g_new = np.empty([432, 1])
+g1 = np.empty([432, 1])
+g_new1 = np.empty([432, 1])
+x1 = np.empty([432, 1])
+x_new1 = np.empty([18, 24])
+def bfgs_newton(x, iters):
+    """
+    实现BFGS拟牛顿法
+    :param f: 原函数
+    :param x: 初始值
+    :param iters: 遍历的最大epoch
+    :return: 最终更新完毕的x值
+    """
+    # 步长。设为1才能收敛，小于1不能收敛
+    learning_rate = 1
+    # 初始化B正定矩阵
+    B = np.eye(432)
+    # x_len = x.shape[0]
+    # 一阶导g的第二范式的最小值（阈值）
+    epsilon = 1e-5
+    t = 0
+    for i in range(1, iters):
+        t = 0
+        for j in range(0, 18):
+            for k in range(0, 24):
+                g[t][0] = gfun(x, j, k)
+                x1[t][0] = x[j][k]
+                t = t + 1
+        # g = jacobian(f, x)
+        if np.linalg.norm(g) < epsilon:
+            break
+        p = np.linalg.solve(B, g)
+        # 更新x值
+        x_new = x1 - p*learning_rate
+        t = 0
+        for j in range(0, 18):
+            for k in range(0, 24):
+                x_new1[j][k] = x_new[t][0]
+                t = t + 1
+        # print("第" + str(i) + "次迭代后的结果为:", x_new1)
+        t = 0
+        for j in range(0, 18):
+            for k in range(0, 24):
+                g_new[t][0] = gfun(x_new1, j, k)
+                t = t + 1
+        # for j in range(0, 18):
+        #     for k in range(0, 24):
+        #         # g1[t][0] = g[j][k]
+        #         g_new1[t][0] = g_new[j][k]
+        #         # x1[t][0] = x[j][k]
+        #         x_new1[t][0] = x_new[j][k]
+        #         t = t + 1
+
+        y = g_new - g
+        k = x_new - x1
+        y_t = np.transpose(y)
+        Bk = np.dot(B, k)
+        k_t = np.transpose(k)
+        k_t_B = np.dot(np.transpose(k), B)
+        kBk = np.dot(np.dot(np.transpose(k), B), k)
+        # 更新B正定矩阵。完全按照公式来计算
+        B = B + np.dot(y, y_t) / np.dot(y_t, k) - np.dot(np.dot(Bk, k_t), B)  / kBk
+        t = 0
+        for j in range(0, 18):
+            for k in range(0, 24):
+                x[j][k] = x_new[t][0]
+                t = t + 1
+        # x = x_new
+        # print("yeah")
+    return x
+
+
+
+
+def gfun(x, m, n):
+    sumk1 = []
+    sumk2 = []
+    sumk3 = []
+    sumk4 = []
+    sum0 = 0
+    sum1 = 0
+    sum2 = 0
+    sum3 = 0
+    sum4 = 0
+    sum5 = 0
+
+    for i in range(0, 5):
+        sumk2 = []
+        for j in range(0, labels_ncols):
+            sumk1 = []
+            for k in range(0, feature_ncols):
+                # a = labels.cell(i, j).value
+                # b = feature.cell(i, k).value
+                sumk1.append(x[j][k] * feature.cell(i, k).value)
+            sum1 = sum(sumk1)
+            sumk2.append(math.exp(sum1))
+        sumk4.append(sum(sumk2))
+
+    for i in range(0, 5):
+        a = labels.cell(i, m).value
+        b = feature.cell(i, n).value
+        sumk3.append(a * b)
+    sum5 = sum(sumk3)
+
+    for i in range(0, 5):
+        sumk1 = []
+        for k in range(0, feature_ncols):
+            sumk1.append(x[m][k] * feature.cell(i, k).value )
+        sum1 = sum(sumk1)
+        # sumk2.append( math.exp(sum1))
+        sum0 = sum0 + math.exp(sum1) * feature.cell(i, n).value / sumk4[i]
+    return sum0 - sum5
+
+if __name__=="__main__":
+    x = np.ones((18, 24))
+    # print(bfgs_newton(x, 5))
+    s = np.empty([24, 1])
+    for k in range(0, 24):
+        s[k][0] = feature.cell(6, k).value
+    q = np.dot(bfgs_newton(x, 5), s)
+    for i in range(0, 18):
+        q[i][0] = math.exp(q[i][0])
+    sum_final = sum(q)
+    for i in range(0, 18):
+        print(q[i][0] / sum_final)
+
+
